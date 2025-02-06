@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Flappy Bird Clone</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #70c5ce; overflow: hidden; }
+    canvas { display: block; margin: auto; background: #70c5ce; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="288" height="512"></canvas>
+<script>
+(function(){
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width, height = canvas.height;
+  let frames = 0, score = 0, gameSpeed = 2, gravity = 0.25;
+  
+  const bird = {
+    x: 50,
+    y: height / 2,
+    width: 34,
+    height: 24,
+    velocity: 0,
+    jump: 4.6,
+    rotation: 0
+  };
+  
+  const pipeWidth = 52, pipeGap = 100;
+  let pipes = [];
+  
+  // Audio using Web Audio API
+  let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playSound(freq, duration) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.type = "square";
+    gain.gain.value = 0.1;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(() => osc.stop(), duration);
+  }
+  
+  function resetGame() {
+    bird.y = height / 2;
+    bird.velocity = 0;
+    pipes = [];
+    frames = 0;
+    score = 0;
+  }
+  
+  // Input
+  window.addEventListener("keydown", function(e) {
+    if(e.key === " " || e.key === "ArrowUp") {
+      bird.velocity = -bird.jump;
+      playSound(400, 100);
+    }
+  });
+  window.addEventListener("touchstart", function(e) {
+    bird.velocity = -bird.jump;
+    playSound(400, 100);
+  });
+  
+  function update() {
+    frames++;
+    
+    // Bird physics
+    bird.velocity += gravity;
+    bird.y += bird.velocity;
+    
+    // Bird rotation
+    if(bird.velocity >= bird.jump) {
+      bird.rotation = Math.min(Math.PI/2, bird.rotation + 0.03);
+    } else {
+      bird.rotation = -0.3;
+    }
+    
+    // Ground collision
+    if(bird.y + bird.height/2 >= height - 112) {
+      bird.y = height - 112 - bird.height/2;
+      playSound(100, 200);
+      resetGame();
+    }
+    
+    // Generate pipes every 90 frames
+    if(frames % 90 === 0) {
+      const pipeTopHeight = Math.floor(Math.random() * (height - pipeGap - 112 - 40)) + 20;
+      pipes.push({
+        x: width,
+        top: pipeTopHeight,
+        bottom: height - 112 - (pipeTopHeight + pipeGap),
+        scored: false
+      });
+    }
+    
+    // Move pipes and detect collisions
+    for(let i = 0; i < pipes.length; i++) {
+      pipes[i].x -= gameSpeed;
+      
+      // Collision detection
+      if(bird.x + bird.width/2 > pipes[i].x && bird.x - bird.width/2 < pipes[i].x + pipeWidth) {
+        if(bird.y - bird.height/2 < pipes[i].top || bird.y + bird.height/2 > height - 112 - pipes[i].bottom) {
+          playSound(100, 200);
+          resetGame();
+        }
+      }
+      
+      // Increase score when passing a pipe
+      if(pipes[i].x + pipeWidth < bird.x - bird.width/2 && !pipes[i].scored) {
+        score++;
+        pipes[i].scored = true;
+        playSound(800, 100);
+      }
+    }
+    
+    // Remove off-screen pipes
+    if(pipes.length && pipes[0].x < -pipeWidth) {
+      pipes.shift();
+    }
+  }
+  
+  function draw() {
+    // Draw sky
+    ctx.fillStyle = "#70c5ce";
+    ctx.fillRect(0, 0, width, height);
+    
+    // Draw pipes
+    pipes.forEach(pipe => {
+      ctx.fillStyle = "#228B22";
+      // Top pipe
+      ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+      // Bottom pipe
+      ctx.fillRect(pipe.x, height - 112 - pipe.bottom, pipeWidth, pipe.bottom);
+    });
+    
+    // Draw ground
+    ctx.fillStyle = "#ded895";
+    ctx.fillRect(0, height - 112, width, 112);
+    
+    // Draw bird
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    ctx.rotate(bird.rotation);
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(-bird.width/2, -bird.height/2, bird.width, bird.height);
+    ctx.restore();
+    
+    // Draw score
+    ctx.fillStyle = "white";
+    ctx.font = "24px sans-serif";
+    ctx.fillText(score, width / 2 - 10, 50);
+  }
+  
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+  
+  loop();
+})();
+</script>
+</body>
+</html>
